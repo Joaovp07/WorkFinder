@@ -3,8 +3,7 @@ import path from "path";
 import multer from "multer";
 import { createServer as createViteServer } from "vite";
 import nodemailer from "nodemailer";
-import { GoogleGenAI } from "@google/genai";
-import pdfParse from "pdf-parse";
+import pdfParse from "pdf-parse-debugging-disabled";
 
 // Setup multer for memory storage (for resume upload)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -15,9 +14,6 @@ async function startServer() {
 
   // Middleware to parse JSON bodies
   app.use(express.json());
-
-  // Use Gemini API
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   // 1. POST /api/usuario -> Recebe profile e currículo (fallback para salvar, ou apenas processar direto)
   // Como é protótipo, podemos juntar a análise na rota /api/analisar-vagas
@@ -51,24 +47,33 @@ async function startServer() {
       const emailMatch = text.match(emailRegex);
       const email = emailMatch ? emailMatch[0] : "";
 
+      const linkedinRegex = /(?:linkedin\.com\/in\/)([a-zA-Z0-9-_]+)/i;
+      const linkedinMatch = text.match(linkedinRegex);
+      const linkedin = linkedinMatch ? `linkedin.com/in/${linkedinMatch[1]}` : "";
+
+      const githubRegex = /(?:github\.com\/)([a-zA-Z0-9-_]+)/i;
+      const githubMatch = text.match(githubRegex);
+      const github = githubMatch ? `github.com/${githubMatch[1]}` : "";
+
       // Try to find a name (usually at the very top, so first non-empty line)
       const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       let nome = lines.length > 0 ? lines[0] : "";
       
-      // se a primeira for 'curriculum vitae' pegar a segunda
       if (nome.toLowerCase().includes("curriculum") || nome.toLowerCase().includes("currículo")) {
           nome = lines.length > 1 ? lines[1] : nome;
       }
 
       // Try to extract some common technologies
       const commonTechs = ["React", "Node.js", "JavaScript", "TypeScript", "Python", "Java", "C#", "PHP", "HTML", "CSS", "SQL", "PostgreSQL", "MongoDB", "AWS", "Docker", "Angular", "Vue", "Ruby"];
-      const foundTechs = commonTechs.filter(tech => new RegExp("\\\\b" + tech.replace(".", "\\\\.") + "\\\\b", "i").test(text));
+      const foundTechs = commonTechs.filter(tech => new RegExp("\\b" + tech.replace(".", "\\.") + "\\b", "i").test(text));
 
       // Try to guess required role
       let cargo = "Desenvolvedor de Software";
       if (/frontend|front-end|front end/i.test(text)) cargo = "Desenvolvedor Front-end";
       else if (/backend|back-end|back end/i.test(text)) cargo = "Desenvolvedor Back-end";
       else if (/fullstack|full-stack|full stack/i.test(text)) cargo = "Desenvolvedor Fullstack";
+      else if (/data/i.test(text)) cargo = "Engenharia de Dados";
+      else if (/devops/i.test(text)) cargo = "DevOps/SRE";
 
       // Try to guess level
       let nivel = "Júnior";
@@ -76,13 +81,64 @@ async function startServer() {
       else if (/pleno/i.test(text)) nivel = "Pleno";
       else if (/estágio|estagiário|intern/i.test(text)) nivel = "Estágio";
 
+      // Extrair cidade (heuristic)
+      let cidade = "";
+      const cidadeRegex = /(São Paulo|Rio de Janeiro|Belo Horizonte|Curitiba|Porto Alegre|Brasília|Recife|Fortaleza|Salvador)\b/i;
+      const cidadeMatch = text.match(cidadeRegex);
+      if (cidadeMatch) {
+         cidade = cidadeMatch[0];
+      }
+
+      // Extract sections based on keywords
+      let resumo = "";
+      let experiencias = "";
+      let formacao = "";
+
+      let currentSection = "";
+      
+      for (const line of lines) {
+        const lowerLine = line.toLowerCase();
+        
+        if (/(resumo|perfil|sobre mim|objetivo)/i.test(lowerLine) && lowerLine.length < 30) {
+          currentSection = "resumo";
+          continue;
+        } else if (/(experiência|histórico|experiencia profissional|professional experience)/i.test(lowerLine) && lowerLine.length < 40) {
+          currentSection = "experiencias";
+          continue;
+        } else if (/(formação|educação|acadêmica|formacao|education)/i.test(lowerLine) && lowerLine.length < 30) {
+          currentSection = "formacao";
+          continue;
+        } else if (/(habilidades|skills|idiomas|cursos|certificações|projetos)/i.test(lowerLine) && lowerLine.length < 30) {
+          currentSection = "outros";
+          continue;
+        }
+
+        if (currentSection === "resumo") {
+          if (resumo.length < 500) resumo += line + "\n";
+        } else if (currentSection === "experiencias") {
+          if (experiencias.length < 1500) experiencias += line + "\n";
+        } else if (currentSection === "formacao") {
+          if (formacao.length < 1000) formacao += line + "\n";
+        }
+      }
+
+      if (!resumo.trim() && lines.length > 2) {
+         // Se não achou uma seção clara de resumo, usa as primeiras linhas (depois do nome)
+         resumo = lines.slice(1, 5).join("\n");
+      }
+
       res.json({
         nome: nome || "",
         email: email || "",
+        linkedin: linkedin,
+        github: github,
         cargo: cargo,
         nivel: nivel,
+        cidade: cidade,
         tecnologias: foundTechs.join(", ") || "",
-        resumo: "Resumo extraído automaticamente do currículo.",
+        formacao: formacao.trim(),
+        experiencias: experiencias.trim(),
+        resumo: resumo.trim(),
       });
 
     } catch (error) {
@@ -91,132 +147,93 @@ async function startServer() {
     }
   });
 
-  // 3. POST /api/analisar-vagas -> Analisa perfil vs vagas usando Gemini
-  app.post("/api/analisar-vagas", upload.single("curriculo"), async (req, res) => {
+  // Endpoint /api/analisar-vagas removido (agora processado localmente no frontend)
+
+  // 9. POST /api/webhook-mock -> Mock da integração com Make.com
+  app.post("/api/webhook-mock", async (req, res) => {
     try {
-      const profileData = JSON.parse(req.body.profile);
-      const limit = parseInt(req.body.limit || "20"); // limit jobs to analyze to save time/tokens
+      console.log("[Webhook Mock] Recebido payload do frontend:", req.body);
       
-      // Fetch jobs from Remotive
-      let jobs = [];
-      try {
-        // limit fetching category
-        const response = await fetch("https://remotive.com/api/remote-jobs?category=software-dev&limit=50");
-        const data = await response.json();
-        jobs = data.jobs.slice(0, limit); // slice to avoid huge payload
-      } catch (err) {
-        // Fallback local jobs if API fails
-        jobs = [
-          {
-            id: 1,
-            title: "Desenvolvedor Front-end Júnior",
-            company_name: "Tech Solutions",
-            candidate_required_location: "Remote",
-            job_type: "full_time",
-            description: "Conhecimento em React, JavaScript, HTML, CSS."
-          },
-          {
-            id: 2,
-            title: "Desenvolvedor Back-end",
-            company_name: "Code Corp",
-            candidate_required_location: "Remote",
-            job_type: "full_time",
-            description: "Experiência com Node.js, Express e PostgreSQL."
-          }
-        ];
+      const { candidato, curriculoBase64, fileName } = req.body;
+      
+      if (!candidato) {
+         return res.status(400).json({ error: "Dados do candidato não fornecidos." });
       }
 
-      // Process PDF if it exists
-      let curriculoText = "";
-      let pdfPart = null;
-      
-      if (req.file) {
-        // We'll send the PDF as inlineData to Gemini 1.5
-        pdfPart = {
-          inlineData: {
-            data: req.file.buffer.toString("base64"),
-            mimeType: req.file.mimetype,
-          },
-        };
-      }
+      // Simulate a slightly delayed make.com response
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Create a prompt for Gemini
-      const prompt = `
-Você é um recrutador especialista em TI. Avalie a compatibilidade entre o perfil do candidato e a lista de vagas.
+      // Mock response array that Make would return after processing Gemini + Remotive
+      const makeMockResponse = [
+        {
+          vagaId: 101,
+          titulo: "Desenvolvedor Front-end Sênior",
+          empresa: "Acme Corp",
+          compatibilidade: 95,
+          localizacao: "São Paulo, SP (Remoto)",
+          modelo: "remoto",
+          tecnologias: ["React", "TypeScript", "Tailwind CSS"],
+          motivos: [
+            "Você possui forte conhecimento nas principais tech da vaga.",
+            "O nível da vaga condiz com seu resumo.",
+            "A vaga é remota, combinando com sua preferência."
+          ],
+          link: "https://remotive.com/job/101"
+        },
+        {
+          vagaId: 102,
+          titulo: "Engenheiro de Software Fullstack",
+          empresa: "Global Tech",
+          compatibilidade: 82,
+          localizacao: "Remoto Global",
+          modelo: "remoto",
+          tecnologias: ["Node.js", "React", "PostgreSQL"],
+          motivos: [
+            "Tecnologias compatíveis, embora focadas também no back-end.",
+            "Excelente empresa com cultura remote-first."
+          ],
+          link: "https://remotive.com/job/102"
+        },
+        {
+          vagaId: 103,
+          titulo: "Desenvolvedor UI/UX",
+          empresa: "Designers Inc",
+          compatibilidade: 65,
+          localizacao: "Híbrido",
+          modelo: "híbrido",
+          tecnologias: ["Figma", "CSS", "React"],
+          motivos: [
+            "Exige mais design do que você especificou.",
+            "A vaga é híbrida, mas ainda pode ser interessante."
+          ],
+          link: "https://remotive.com/job/103"
+        }
+      ];
 
-Perfil do Candidato:
-Nome: ${profileData.nome}
-Cargo Desejado: ${profileData.cargo}
-Nível: ${profileData.nivel}
-Preferência de trabalho: ${profileData.modalidade}
-Tecnologias: ${profileData.tecnologias}
-Resumo: ${profileData.resumo}
-${pdfPart ? "O currículo em PDF do candidato também foi anexado à chamada." : ""}
+      res.json({ jobs: makeMockResponse });
+    } catch (error) {
+      console.error("[Webhook Mock] Error:", error);
+      res.status(500).json({ error: "Failed to process webhook mock" });
+    }
+  });
 
-Lista de Vagas:
-${jobs.map((j: any) => `ID: ${j.id} | Título: ${j.title} | Empresa: ${j.company_name} | Requisito: ${j.description.substring(0, 300)}...`).join("\n\n")}
+  // Make.com Webhook Proxy to bypass CORS
+  app.post("/api/webhook-proxy", async (req, res) => {
+    try {
+      const { webhookUrl, payload } = req.body;
+      if (!webhookUrl) return res.status(400).json({ error: "Missing webhookUrl" });
 
-Sua tarefa:
-Analise o perfil do candidato (e o pdf, se existir) contra cada vaga e retorne APENAS um JSON array.
-Cada objeto do array deve seguir extritamente este formato:
-{
-  "vagaId": (numero id da vaga),
-  "titulo": "(titulo da vaga)",
-  "empresa": "(empresa)",
-  "compatibilidade": (numero de 0 a 100),
-  "tecnologias": [(array de strings com tecnologias identificadas na vaga)],
-  "modelo": "(remoto, hibrido, ou presencial - inferido pela vaga)",
-  "motivos": [(array com 3 a 4 strings explicando motivos da recomendação ou falhas)],
-  "link": "(url da vaga ou vazio)"
-}
-
-Regra de pontuação (100 pontos):
-- Tecnologias em comum: até 45 pts
-- Nível profissional compatível: até 20 pts
-- Modelo de trabalho compatível: até 15 pts
-- Cargo semelhante: até 10 pts
-- Localização/Outros: até 10 pts
-
-Retorne APENAS o array JSON, começando com [ e terminando com ]. Sem formatação markdown de blocos de codigo.
-Vagas com melhor compatibilidade (acima de 50) devem vir primeiro. Retorne no máximo as 5 melhores vagas.
-`;
-      
-      let contents: any[] = [{ text: prompt }];
-      if (pdfPart) {
-        contents.unshift(pdfPart);
-      }
-
-      const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: contents,
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
 
-      let responseText = response.text || "[]";
-      // Sanitize JSON
-      responseText = responseText.replace(/^```json\n/, "").replace(/\n```$/, "").trim();
-      if(!responseText.startsWith("[")) {
-         responseText = responseText.substring(responseText.indexOf("["));
-      }
-      if(!responseText.endsWith("]")) {
-        responseText = responseText.substring(0, responseText.lastIndexOf("]") + 1);
-      }
-
-      const analyisResult = JSON.parse(responseText);
-
-      // Map back links from original jobs if we have them
-      const finalResult = analyisResult.map((resJob: any) => {
-        const originalJob = jobs.find((j: any) => j.id.toString() === resJob.vagaId?.toString());
-        return {
-          ...resJob,
-          link: originalJob?.url || originalJob?.link || resJob.link || "#",
-          localizacao: originalJob?.candidate_required_location || "Não especificado"
-        };
-      }).sort((a: any, b: any) => b.compatibilidade - a.compatibilidade);
-
-      res.json(finalResult);
+      const responseText = await response.text();
+      res.status(response.status).send(responseText);
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Failed to analyze jobs" });
+      console.error("[Webhook Proxy] Error:", error);
+      res.status(500).json({ error: "Failed proxying webhook: " + (error instanceof Error ? error.message : String(error)) });
     }
   });
 
@@ -279,6 +296,11 @@ Vagas com melhor compatibilidade (acima de 50) devem vir primeiro. Retorne no m�
   });
 
 
+  // API 404 fallback
+  app.use("/api", (req, res) => {
+    res.status(404).json({ error: "API endpoint not found", path: req.path });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -296,6 +318,12 @@ Vagas com melhor compatibilidade (acima de 50) devem vir primeiro. Retorne no m�
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  // Error handling middleware to prevent HTML errors
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Unhandled Server Error:", err);
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   });
 }
 

@@ -21,7 +21,7 @@
     "motion": "^12.23.24",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.7",
-    "pdf-parse": "^1.1.1",
+    "pdf-parse-debugging-disabled": "^1.1.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "vite": "^6.2.3"
@@ -31,7 +31,6 @@
     "@types/multer": "^2.1.0",
     "@types/node": "^22.14.0",
     "@types/nodemailer": "^8.0.0",
-    "@types/pdf-parse": "^1.1.5",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
