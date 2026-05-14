@@ -24,6 +24,8 @@ export default function App() {
   const [emailStatus, setEmailStatus] = useState<{ status: 'idle' | 'loading' | 'success' | 'error', link?: string }>({ status: 'idle' });
 
   const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [extractSuccess, setExtractSuccess] = useState<boolean>(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setProfileData({ ...profileData, [e.target.name]: e.target.value });
@@ -33,6 +35,8 @@ export default function App() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setPdfFile(file);
+      setExtractError(null);
+      setExtractSuccess(false);
 
       // Extract data automatically via local API (for convenience before sending to Make)
       const formData = new FormData();
@@ -76,14 +80,15 @@ export default function App() {
             tecnologias: data.tecnologias ? (prev.tecnologias ? `${prev.tecnologias}, ${data.tecnologias}` : data.tecnologias) : prev.tecnologias,
             resumo: data.resumo || prev.resumo,
           }));
+          setExtractSuccess(true);
         } else {
-           let errorMessage = 'Aviso: Não foi possível extrair dados automaticamente do PDF.';
-           if (data && data.error) errorMessage = `Falha na extração do PDF:\n${data.error}`;
-           alert(errorMessage);
+           let errorMessage = 'Não foi possível extrair dados automaticamente do PDF.';
+           if (data && data.error) errorMessage = data.error;
+           setExtractError(errorMessage);
         }
       } catch (err) {
         console.error("Erro ao extrair dados do PDF", err);
-        alert('Aviso: Ocorreu um erro de rede ou servidor ao extrair os dados do currículo.');
+        setExtractError('Ocorreu um erro de rede ou servidor ao extrair os dados do currículo.');
       } finally {
         setExtracting(false);
       }
@@ -236,22 +241,34 @@ export default function App() {
                 {/* Upload de Currículo */}
                 <div className="space-y-3">
                   <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest block">Preenchimento Mágico</label>
-                  <div className={`border border-dashed ${extracting ? 'border-blue-400 bg-blue-50/50' : 'border-gray-200 bg-gray-50/50 hover:bg-gray-50 hover:border-gray-300'} rounded-2xl p-6 text-center transition-all cursor-pointer relative`}>
+                  <div className={`border border-dashed ${extracting ? 'border-blue-400 bg-blue-50/50' : extractError ? 'border-red-300 bg-red-50/30' : extractSuccess ? 'border-emerald-300 bg-emerald-50/30' : 'border-gray-200 bg-gray-50/50 hover:bg-gray-50 hover:border-gray-300'} rounded-2xl p-6 text-center transition-all cursor-pointer relative`}>
                     <input type="file" accept="application/pdf" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" disabled={extracting}/>
                     {extracting ? (
-                      <div className="flex flex-col items-center justify-center space-y-3">
+                      <div className="flex flex-col items-center justify-center space-y-3 py-2">
                         <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-                        <p className="text-blue-600 font-medium text-xs uppercase tracking-widest">Extraindo dados e preenchendo formulário...</p>
+                        <p className="text-blue-600 font-medium text-xs uppercase tracking-widest">Lendo currículo e preenchendo...</p>
+                      </div>
+                    ) : extractSuccess ? (
+                      <div className="flex flex-col items-center justify-center space-y-2 py-2">
+                        <CheckCircle className="w-8 h-8 text-emerald-500 mb-1" />
+                        <p className="text-emerald-700 font-medium text-sm">Dados extraídos com sucesso!</p>
+                        <p className="text-emerald-600/70 text-xs text-center max-w-sm">
+                           Verifique os campos abaixo. Arquivo: {pdfFile?.name}
+                        </p>
                       </div>
                     ) : (
                       <>
-                        <UploadCloud className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-                        {pdfFile ? (
+                        <UploadCloud className={`w-8 h-8 mx-auto mb-3 ${extractError ? 'text-red-400' : 'text-gray-400'}`} />
+                        {pdfFile && !extractError ? (
                           <p className="text-gray-900 font-medium text-sm">{pdfFile.name}</p>
                         ) : (
-                          <div className="space-y-1">
-                            <p className="text-gray-700 font-medium text-sm">Faça upload do seu currículo em PDF</p>
-                            <p className="text-gray-400 text-xs">Arraste ou clique para preencher os campos abaixo automaticamente.</p>
+                          <div className="space-y-2">
+                            {extractError ? (
+                                <p className="text-red-600 font-medium text-sm px-4">{extractError}</p>
+                            ) : (
+                                <p className="text-gray-700 font-medium text-sm">Faça upload do seu currículo em PDF</p>
+                            )}
+                            <p className="text-gray-400 text-xs">Arraste ou clique para tentar preencher automaticamente.</p>
                           </div>
                         )}
                       </>
