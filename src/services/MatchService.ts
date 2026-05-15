@@ -1,4 +1,5 @@
 import Groq from "groq-sdk";
+import { Resend } from "resend";
 import { fetchJobs } from "./fetchJobs";
 
 /**
@@ -61,9 +62,9 @@ export class MatchService {
     // 2. Análise via Llama 3 - 70B (Velocidade e Precisão) usando Groq
     const melhoresVagas = await this.analyzeMatchWithIA(candidato, vagasCapturadas);
 
-    // 3. Disparo do Email via Make.com
+    // 3. Disparo do Email via Resend
     if (candidato.email && melhoresVagas.length > 0) {
-      await this.triggerMakeEmailWebhook(candidato, melhoresVagas);
+      await this.sendEmailViaResend(candidato, melhoresVagas);
     }
 
     return melhoresVagas;
@@ -123,7 +124,7 @@ RETORNE ESTRITAMENTE UM JSON VÁLIDO no seguinte formato (uma array de objetos):
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        model: "llama3-70b-8192", // Llama 3 70B via Groq tem retornos absurdamente rápidos
+        model: "llama-3.3-70b-versatile", // Llama 3 70B via Groq tem retornos absurdamente rápidos
         temperature: 0.1, // temperatura baixa para respostas determinísticas
         max_tokens: 1024,
       });
@@ -157,39 +158,56 @@ RETORNE ESTRITAMENTE UM JSON VÁLIDO no seguinte formato (uma array de objetos):
   }
 
   /**
-   * Módulo de Serviço de E-mail via Webhook Make
+   * Módulo de Serviço de E-mail via Resend
    */
-  private async triggerMakeEmailWebhook(candidato: Candidato, vagasRanqueadas: any[]) {
+  private async sendEmailViaResend(candidato: Candidato, vagasRanqueadas: any[]) {
     try {
-      const webhookUrl = process.env.VITE_MAKE_WEBHOOK_URL || process.env.MAKE_WEBHOOK_URL;
+      const resendApiKey = process.env.RESEND_API_KEY;
       
-      if (!webhookUrl) {
-        console.warn("[MatchService] VITE_MAKE_WEBHOOK_URL não configurada. O e-mail não será enviado.");
+      if (!resendApiKey) {
+        console.warn("[MatchService] RESEND_API_KEY não configurada. O e-mail não será enviado.");
         return;
       }
 
-      console.log(`[MatchService] Enviando dados para o webhook do Make.com para notificar ${candidato.email}...`);
+      console.log(`[MatchService] Enviando e-mail via Resend para ${candidato.email}...`);
+      const resend = new Resend(resendApiKey);
 
-      const payload = {
-        candidato,
-        vagas: vagasRanqueadas
-      };
+      let htmlVagas = vagasRanqueadas.map((v: any) => `
+        <div style="margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
+          <h3>${v.titulo} na ${v.empresa}</h3>
+          <p><strong>Compatibilidade:</strong> <span style="color: green;">${v.compatibilidade}%</span></p>
+          <p><strong>Por que escolhemos esta vaga?</strong></p>
+          <ul>
+            ${v.motivos.map((m: string) => `<li>${m}</li>`).join('')}
+          </ul>
+          <a href="${v.link_vaga}" style="display:inline-block; padding:10px 15px; background: #007bff; color: white; text-decoration: none; border-radius: 5px;">Candidatar-se</a>
+        </div>
+      `).join("");
 
-      const res = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+      const { data, error } = await resend.emails.send({
+        from: 'WorkFinder AI <onboarding@resend.dev>', // Resend standard testing email
+        to: candidato.email,
+        subject: `✅ Encontramos vagas ideais para você, ${candidato.nome}!`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: auto;">
+            <h2>Olá, ${candidato.nome}! 👋</h2>
+            <p>O nosso motor de IA Llama 3 ranqueou ${vagasRanqueadas.length} vagas perfeitas de acordo com o seu perfil!</p>
+            <hr />
+            ${htmlVagas}
+            <br />
+            <p>Boa sorte nas candidaturas!</p>
+            <p><strong>Equipe WorkFinder AI</strong></p>
+          </div>
+        `,
       });
 
-      if (!res.ok) {
-        console.error(`[MatchService] Erro ao chamar o Make.com: ${res.status} ${res.statusText}`);
-        const text = await res.text();
-        console.error(`[MatchService] Retorno do Make.com: ${text}`);
+      if (error) {
+        console.error(`[MatchService] Erro da API do Resend:`, error);
       } else {
-        console.log("[MatchService] Webhook do Make.com chamado com sucesso!");
+        console.log("[MatchService] E-mail enviado com sucesso via Resend! ID:", data?.id);
       }
     } catch (err) {
-      console.error("[MatchService] Erro ao disparar webhook do Make:", err);
+      console.error("[MatchService] Erro inesperado ao tentar enviar e-mail pelo Resend:", err);
     }
   }
 }

@@ -39,18 +39,18 @@ export default function App() {
       setExtractError(null);
       setExtractSuccess(false);
 
-      // Extract data automatically via local API (for convenience before sending to Make)
-      const formData = new FormData();
-      formData.append('curriculo', file);
-      
+      // Extract data automatically via local API
       try {
         setExtracting(true);
+        const curriculoBase64 = await toBase64(file);
+        
         const res = await fetch('/api/extrair-curriculo', {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
-          body: formData,
+          body: JSON.stringify({ curriculoBase64 }),
         });
 
         const contentType = res.headers.get("content-type");
@@ -124,8 +124,8 @@ export default function App() {
     setLoading(true);
 
     try {
-      // ===== INTEGRAÇÃO COM MAKE.COM (WEBHOOK) =====
-      // Aqui disparamos o POST para o Webhook do Make.com com todos os dados do candidato.
+      // ===== INTEGRAÇÃO COM BACKEND (IA + EMAIL) =====
+      // Aqui disparamos o POST para a rota /api/match-vagas com os dados do candidato.
       
       let pdfBase64 = null;
       if (pdfFile) {
@@ -202,9 +202,9 @@ export default function App() {
   };
 
   const enviarEmail = async () => {
-    // Na nova arquitetura, o envio de e-mail deve acontecer no próprio fluxo do Make.com!
-    // Aqui seria apenas um trigger extra se precisasse, mas o ideal é que o Make mande direto.
-    // Vamos simular a mensagem de sucesso que o Make fez isso.
+    // Envio de email adicional se necessário (mock)
+    // O envio principal já acontece no backend com Resend.
+    // Simulando mensagem de sucesso aqui.
     setEmailStatus({ status: 'loading' });
     setTimeout(() => {
         setEmailStatus({ status: 'success', link: '#' });
@@ -261,7 +261,7 @@ export default function App() {
                   </div>
                   <div className="space-y-3 text-sm text-gray-600 leading-relaxed text-balance">
                     <p><strong>1. Extração de Currículo:</strong> Para evitar bloqueios e garantir funcionamento imediato, a leitura do seu currículo em PDF utiliza bibliotecas de texto nativas (pdf-parse) e Expressões Regulares (RegEx) avançadas para extrair seus dados.</p>
-                    <p><strong>2. Integração com Automação (Make / IA):</strong> Se você configurar a variável <code>VITE_MAKE_WEBHOOK_URL</code> no seu `.env`, a plataforma encaminhará seus dados diretamente para a sua automação no <strong>Make.com</strong>, onde você pode processar usando módulos customizados.</p>
+                    <p><strong>2. Notificação por E-mail:</strong> Configurável via `RESEND_API_KEY` para enviar notificações reais simulando aprovação pelas vagas encontradas.</p>
                     <p><strong>3. Fallback Local com Google Deep Search:</strong> Selecionamos as melhores vagas da Remotive e utilizamos o algorítmo interno (Google Deep Search) para simular o score de compatibilidade com precisão detalhada!</p>
                   </div>
                 </div>
@@ -278,9 +278,9 @@ export default function App() {
                     <ol className="list-decimal list-inside space-y-2 ml-1">
                       <li>Use <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">npm install</code> para instalar dependências.</li>
                       <li>Inicie ambos Web/API com <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">npm run dev</code>.</li>
-                      <li>Configure as variáveis em <code>.env</code> (GROQ_API_KEY e VITE_MAKE_WEBHOOK_URL) para liberar o envio de e-mail via Make.</li>
+                      <li>Configure as variáveis em <code>.env</code> (GROQ_API_KEY e RESEND_API_KEY) para ativar as integrações de IA e E-mail.</li>
                     </ol>
-                    <p className="pt-2 text-xs text-gray-400">Todo o fluxo de backend foi projetado para fácil replicação no n8n ou Make.com, alterando apenas a variável <code>VITE_MAKE_WEBHOOK_URL</code>.</p>
+                    <p className="pt-2 text-xs text-gray-400">Desenvolvido pensando na stack de Node (Express), Vite (React), Llama 3 (Groq) e Resend.</p>
                   </div>
                 </div>
               </div>
@@ -434,9 +434,9 @@ export default function App() {
                   <div className="absolute inset-0 border-2 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
                   <Search className="absolute inset-0 m-auto text-blue-600 animate-pulse w-5 h-5" />
                 </div>
-                <h2 className="text-2xl font-display font-medium text-gray-900 mb-3 tracking-tight">Processando no Make.com...</h2>
+                <h2 className="text-2xl font-display font-medium text-gray-900 mb-3 tracking-tight">Processando Análise com IA...</h2>
                 <p className="text-gray-500 max-w-sm mx-auto text-sm leading-relaxed">
-                  Disparando Webhook, buscando dados e analisando match com Gemini.
+                  Buscando vagas e analisando match com a engine Llama 3 (Groq).
                 </p>
               </div>
             ) : (
@@ -459,9 +459,9 @@ export default function App() {
 
                 <div className="mt-12 bg-white border border-gray-200 p-8 rounded-3xl flex flex-col sm:flex-row gap-8 items-center justify-between shadow-[0_4px_20px_rgb(0,0,0,0.03)]">
                   <div>
-                    <h3 className="text-base font-display font-bold text-gray-900 mb-2">Integração Make Completa</h3>
+                    <h3 className="text-base font-display font-bold text-gray-900 mb-2">Processo Completo</h3>
                     <p className="text-gray-500 text-sm leading-relaxed max-w-md">
-                      Pela nova arquitetura, o relatório acima é enviado diretamente para o seu Gmail via Make.com.
+                      Pela nova arquitetura, o relatório acima é enviado diretamente para o seu E-mail via Resend.
                     </p>
                   </div>
                     

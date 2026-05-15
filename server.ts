@@ -1,19 +1,15 @@
 import express from "express";
 import path from "path";
-import multer from "multer";
 import { createServer as createViteServer } from "vite";
 import pdfParse from "pdf-parse-debugging-disabled";
-
-// Setup multer for memory storage (for resume upload)
-const upload = multer({ storage: multer.memoryStorage() });
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   // Middleware to parse JSON bodies
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // Handle OPTIONS for all /api routes
   app.options("/api/*", (req, res) => {
@@ -40,14 +36,16 @@ async function startServer() {
   });
 
   // 2.5 POST /api/extrair-curriculo -> Extrai perfil do currículo sem usar IA
-  app.post("/api/extrair-curriculo", upload.single("curriculo"), async (req, res) => {
+  app.post("/api/extrair-curriculo", async (req, res) => {
     try {
-      console.log("File received:", req.file ? req.file.originalname : "No file");
-      if (!req.file) {
-        return res.status(400).json({ error: "Nenhum arquivo enviado" });
+      if (!req.body || !req.body.curriculoBase64) {
+        return res.status(400).json({ error: "Nenhum curriculo enviado em base64" });
       }
 
-      const data = await pdfParse(req.file.buffer);
+      console.log("PDF base64 received");
+      const buffer = Buffer.from(req.body.curriculoBase64, 'base64');
+
+      const data = await pdfParse(buffer);
       const text = data.text;
 
       // Extract basic info using regex (No AI)
