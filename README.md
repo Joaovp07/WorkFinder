@@ -26,6 +26,7 @@ O projeto foi desenhado para extrair o máximo de um fluxo de automação:
 Para rodar este projeto em sua própria máquina, siga os passos abaixo:
 
 ### Pré-requisitos
+
 - **Node.js** (versão 18+ recomendada)
 - **NPM** ou **Yarn** instalados
 
@@ -33,6 +34,7 @@ Para rodar este projeto em sua própria máquina, siga os passos abaixo:
 
 1. **Clone o repositório e instale as dependências**
    Abra seu terminal na pasta do projeto e rode o comando:
+
    ```bash
    npm install
    ```
@@ -51,6 +53,7 @@ Para rodar este projeto em sua própria máquina, siga os passos abaixo:
 
 3. **Inicie o Servidor de Desenvolvimento**
    Execute o script que inicia tanto o Front-end React (Vite) quanto a API do Back-end Express simultaneamente:
+
    ```bash
    npm run dev
    ```
@@ -60,9 +63,11 @@ Para rodar este projeto em sua própria máquina, siga os passos abaixo:
    [http://localhost:3000](http://localhost:3000)
 
 ## 🛠 Principais Tecnologias Utilizadas
+
 - **Front-end**: React 18, Vite, Tailwind CSS, Lucide React (ícones), Tailwind-Merge, class-variance-authority.
 - **Back-end**: Node.js, Express, tsx (para rodar TypeScript nativamente), Multer (uploads em memória), pdf-parse (leitura de PDF).
 - **Envio de E-mail**: Nodemailer.
 
 ## ✨ Evoluções Futuras
+
 Se você quiser ativar IA real para extração e matches no seu terminal, basta incluir a biblioteca `@google/genai` e substituir a rota `/api/webhook-mock` ou `/api/extrair-curriculo` por chamadas diretas ou apontar a URL de Webhook no frontend (`src/App.tsx`) para um Webhook válido criado na sua própria conta do Make.com. Assim, o app ganha o verdadeiro poder de IA generativa em seu processamento.
