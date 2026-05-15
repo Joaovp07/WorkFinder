@@ -32,7 +32,12 @@ export const JobCard: React.FC<{ job: Job }> = ({ job }) => {
       ? "bg-blue-500"
       : "bg-gray-400";
 
-  const hrefLink = job.link_vaga || job.link || "#";
+  let hrefLink = "#";
+  if (typeof job.link_vaga === "string" && job.link_vaga.trim() !== "") {
+    hrefLink = job.link_vaga;
+  } else if (typeof job.link === "string" && job.link.trim() !== "") {
+    hrefLink = job.link;
+  }
 
   return (
     <div

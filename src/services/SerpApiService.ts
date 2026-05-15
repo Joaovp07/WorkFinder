@@ -32,7 +32,25 @@ export class SerpApiService {
     const apiKey = process.env.SERPAPI_API_KEY;
 
     if (!apiKey) {
-      throw new Error("SERPAPI_API_KEY não configurada no arquivo .env");
+      console.warn("[SerpApiService] SERPAPI_API_KEY não configurada. Usando vagas em fallback (mock).");
+      return [
+        {
+          titulo: "Desenvolvedor Backend Node.js (Mock)",
+          empresa: "Tech Corp Brasil",
+          localizacao: "São Paulo, SP (Remoto)",
+          modelo_trabalho: "Remoto",
+          link_vaga: "https://google.com",
+          descricao: "Vaga mockada devido a falta de API_KEY da SerpApi. Exigimos Node, React e AWS."
+        },
+        {
+          titulo: "Engenheiro Frontend React Pleno (Mock)",
+          empresa: "Startup Innovate",
+          localizacao: "Remoto",
+          modelo_trabalho: "Remoto",
+          link_vaga: "https://google.com",
+          descricao: "Vaga simulada de Frontend utilizando React e Tailwind"
+        }
+      ];
     }
 
     // Pega as 3 primeiras tecnologias para não deixar a query muito longa

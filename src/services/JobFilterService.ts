@@ -27,7 +27,7 @@ export class JobFilterService {
     processados = this.filterBySeniority(
       processados,
       candidato.senioridade || "Junior",
-    ); // Assume Junior se não estiver claro
+    ); 
 
     // Limite de Payload: Retorna no máximo as 50 melhores para não estourar o limite de tokens da LLM, dando mais opções ao Gemini.
     return processados.slice(0, 50);
@@ -89,27 +89,7 @@ export class JobFilterService {
    * Descarta sumariamente vagas onde a localização exigida não contemple o Brasil.
    */
   private static filterByGeography(jobs: any[]): any[] {
-    const validLocationsRegex =
-      /brazil|brasil|américa latina|latin america|latam|worldwide|anywhere/i;
-
     return jobs
-      .filter((job) => {
-        // Usamos candidate_required_location para remotive ou similar, ou modelo_trabalho normalizado do mock
-        const location = (
-          job.localizacao_original ||
-          job.modelo_trabalho ||
-          ""
-        ).toLowerCase();
-        
-        // Se a vaga for remota ou não tiver restrição explícita fora do Brasil/América Latina, nós a mantemos.
-        if (job.modelo_trabalho === "Remoto") return true;
-
-        return (
-          validLocationsRegex.test(location) ||
-          validLocationsRegex.test((job.titulo || "").toLowerCase()) ||
-          location === "" // Aceita locações vazias
-        );
-      })
       .filter((job) => {
         // Refinamento extra: se explicitly diz "US Only" ou "EMEA", então rejeitamos.
         const location = (job.localizacao_original || "").toLowerCase();

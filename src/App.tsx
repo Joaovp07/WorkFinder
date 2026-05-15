@@ -26,18 +26,18 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [profileData, setProfileData] = useState({
-    nome: "",
-    email: "",
-    cargo: "",
-    nivel: "Júnior",
-    cidade: "",
+    nome: "João Silva",
+    email: "joao.silva@exemplo.com",
+    cargo: "Desenvolvedor Front-end",
+    nivel: "Pleno",
+    cidade: "São Paulo, SP",
     modalidade: "remoto",
-    tecnologias: "",
-    experiencias: "",
-    formacao: "",
-    linkedin: "",
-    github: "",
-    resumo: "",
+    tecnologias: "React, Node.js, TypeScript, Tailwind CSS",
+    experiencias: "Desenvolvedor Front-end Pleno na TechCorp (2020 - atual)\n- Criação de interfaces modernas com React e Tailwind.\n\nDesenvolvedor Júnior na WebSolutions (2018 - 2020)\n- Manutenção de sistemas em Javascript e HTML/CSS.",
+    formacao: "Bacharel em Ciência da Computação - USP (2014 - 2018)",
+    linkedin: "linkedin.com/in/joaosilva",
+    github: "github.com/joaosilva",
+    resumo: "Sou um desenvolvedor apaixonado por criar experiências web incríveis, com foco em performance e usabilidade. Tenho mais de 5 anos de experiência no mercado de tecnologia.",
   });
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [jobs, setJobs] = useState<any[]>([]);
@@ -314,7 +314,7 @@ export default function App() {
               className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-black transition-colors"
             >
               <Info className="w-4 h-4" />
-              <span className="hidden sm:block">Sobre o Projeto & IA</span>
+              <span className="hidden sm:block">Como Funciona?</span>
             </button>
           </div>
         </div>
@@ -703,7 +703,7 @@ export default function App() {
                   type="submit"
                   className="bg-black hover:bg-gray-800 text-white px-8 py-4 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 hover:gap-3 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                 >
-                  Disparar Webhook & Buscar
+                  Encontrar Vagas Ideais
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -764,7 +764,7 @@ export default function App() {
                   onClick={() => setStep(1)}
                   className="px-6 py-2.5 bg-black hover:bg-gray-800 text-white rounded-full text-sm font-medium transition-all shadow-sm"
                 >
-                  Revisar Perfil
+                  Editar Currículo
                 </button>
               </div>
             ) : (
@@ -790,13 +790,13 @@ export default function App() {
                     >
                       {emailStatus.status === "loading" && <Loader2 className="w-4 h-4 animate-spin" />}
                       {emailStatus.status === "success" && <Check className="w-4 h-4" />}
-                      {emailStatus.status === "success" ? "E-mail Enviado!" : emailStatus.status === "error" ? "Erro ao Enviar" : "Enviar por E-mail"}
+                      {emailStatus.status === "success" ? "E-mail Enviado!" : emailStatus.status === "error" ? "Erro ao Enviar" : "Receber Alerta"}
                     </button>
                     <button
                       onClick={() => setStep(1)}
                       className="px-5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-sm font-medium border border-gray-200 transition-all shadow-sm"
                     >
-                      Refazer busca
+                      Nova Pesquisa
                     </button>
                   </div>
                 </div>
@@ -808,39 +808,27 @@ export default function App() {
                 </div>
 
                 {totalPages > 1 && (
-                  <div className="mt-12 flex items-center justify-center gap-2">
+                  <div className="mt-12 flex items-center justify-center gap-4">
                     <button
                       onClick={() => paginate(currentPage - 1)}
                       disabled={currentPage === 1}
-                      className="p-2 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                      aria-label="Página anterior"
+                      className="px-4 py-2 flex items-center gap-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
                     >
-                      <ChevronLeft className="w-5 h-5" />
+                      <ChevronLeft className="w-4 h-4" />
+                      Anterior
                     </button>
                     
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          onClick={() => paginate(page)}
-                          className={`w-10 h-10 rounded-full text-sm font-medium transition-all ${
-                            currentPage === page
-                              ? "bg-black text-white"
-                              : "text-gray-600 hover:bg-gray-100"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                    </div>
+                    <span className="text-sm font-medium text-gray-500">
+                      Página {currentPage} de {totalPages}
+                    </span>
 
                     <button
                       onClick={() => paginate(currentPage + 1)}
                       disabled={currentPage === totalPages}
-                      className="p-2 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                      aria-label="Próxima página"
+                      className="px-4 py-2 flex items-center gap-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
                     >
-                      <ChevronRight className="w-5 h-5" />
+                      Próxima
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 )}
