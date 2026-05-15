@@ -1,0 +1,26 @@
+[
+  {
+    "titulo": "Estágio em Desenvolvimento Web",
+    "empresa": "TechStart Inovações",
+    "localizacao": "Remoto",
+    "modelo_trabalho": "Remoto",
+    "tecnologias_identificadas": ["Html", "Css", "Javascript", "React"],
+    "link_vaga": "https://remotive.com/vaga-estagio-web"
+  },
+  {
+    "titulo": "Desenvolvedor Backend Júnior",
+    "empresa": "Fintech Solutions",
+    "localizacao": "São Paulo (Remoto)",
+    "modelo_trabalho": "Remoto",
+    "tecnologias_identificadas": ["Node", "Express", "Sql", "Javascript"],
+    "link_vaga": "https://remotive.com/vaga-backend-junior"
+  },
+  {
+    "titulo": "Desenvolvedor Full Stack Pleno",
+    "empresa": "Global Corp",
+    "localizacao": "Remoto",
+    "modelo_trabalho": "Remoto",
+    "tecnologias_identificadas": ["React", "Typescript", "Node", "Postgres", "Aws"],
+    "link_vaga": "https://remotive.com/vaga-fullstack-pleno"
+  }
+]

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Briefcase, Send, UploadCloud, Search, CheckCircle, Target, ArrowRight, Loader2, Check } from 'lucide-react';
+import { Briefcase, Send, UploadCloud, Search, CheckCircle, Target, ArrowRight, Loader2, Check, Info, X, Terminal, Cpu } from 'lucide-react';
 import { JobCard, Job } from './components/JobCard';
 
 export default function App() {
   const [step, setStep] = useState(1);
+  const [showInfo, setShowInfo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [profileData, setProfileData] = useState({
     nome: '',
@@ -54,7 +55,15 @@ export default function App() {
 
         const contentType = res.headers.get("content-type");
         if (contentType && contentType.includes("text/html")) {
-          throw new Error("O servidor retornou HTML inesperado. A rota não foi encontrada.");
+          const rawHtml = await res.text();
+          console.error("O servidor retornou HTML inesperado:", rawHtml.substring(0, 500));
+          if (res.status === 413) {
+             throw new Error("O arquivo PDF é muito grande. Por favor, envie um currículo menor (limite recomendado: 2MB).");
+          }
+          if (res.status === 502 || res.status === 503 || res.status === 504) {
+             throw new Error("O servidor está reiniciando ou indisponível. Por favor, aguarde alguns segundos e tente novamente.");
+          }
+          throw new Error(`O servidor retornou um formato inválido ao invés de JSON (Status ${res.status}). O serviço pode estar indisponível momentaneamente.`);
         }
 
         const textRes = await res.text();
@@ -129,14 +138,11 @@ export default function App() {
         fileName: pdfFile ? pdfFile.name : null
       };
 
-      const webhookUrl = import.meta.env.VITE_MAKE_WEBHOOK_URL || 'https://hook.us2.make.com/fgimr1c3m4f2oucnr7lpqk88b1l9nec3';
-      
-      // Enviando para o webhook real do Make via proxy interno para evitar CORS
-      
-      const res = await fetch('/api/webhook-proxy', {
+      // Sempre usar a API interna para o fluxo principal (Busca -> IA -> Email)
+      const res = await fetch('/api/match-vagas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ webhookUrl, payload })
+        body: JSON.stringify(payload)
       });
 
       const rawText = await res.text();
@@ -144,23 +150,24 @@ export default function App() {
       let makeResult: any = [];
       
       if (!res.ok) {
-        console.error(`Erro do Make.com (${res.status}): ${rawText}`);
-        let alertMsg = "Não foi possível conectar com o Make.com.";
-        if (res.status === 410 || rawText.includes("no scenario listening") || rawText.includes("not listening")) {
-          alertMsg = "Aviso: O cenário do Make não está rodando (Webhook inativo).";
+        console.error(`Erro do Servidor (${res.status}): ${rawText}`);
+        let alertMsg = "Não foi possível conectar com o servidor local.";
+        let payloadParsed = null;
+        try {
+           payloadParsed = JSON.parse(rawText);
+        } catch(e) {}
+
+        if (payloadParsed?.error) {
+          alertMsg = `Ocorreu um erro na requisição: ${payloadParsed.error}\n${payloadParsed.details || ''}`;
         }
         alert(`${alertMsg}\n\nVamos exibir vagas de simulação (Mock) para fins de teste.`);
       } else {
         try {
-          if (rawText.trim().toLowerCase() === "accepted") {
-            console.warn("Make.com retornou 'Accepted' (comportamento padrão). Para receber as vagas no frontend, adicione um módulo 'Webhook Response' no final do seu cenário no Make.");
-          } else {
-            const data = JSON.parse(rawText);
-            makeResult = data.jobs || data; 
-          }
+          const data = JSON.parse(rawText);
+          makeResult = data.jobs || data; 
         } catch (e) {
-           console.error("Raw response from Make:", rawText);
-           alert(`Aviso: O Make retornou o texto "${rawText.substring(0, 50)}" em vez de um JSON válido.\n\nPara a integração funcionar perfeitamente, o módulo "Webhook Response" no seu cenário do Make deve retornar a lista de vagas no formato JSON.\n\nVamos exibir vagas de simulação (Mock) enquanto você ajusta o cenário no Make!`);
+           console.error("Raw response server:", rawText);
+           alert(`Aviso: O servidor retornou inválido.\n\nVamos exibir vagas de simulação (Mock).`);
         }
       }
 
@@ -215,9 +222,72 @@ export default function App() {
             </div>
             <span className="text-xl font-display font-semibold tracking-tight">WorkFinder</span>
           </div>
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-widest hidden sm:block">Match Inteligente</p>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setShowInfo(true)}
+              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-black transition-colors"
+            >
+              <Info className="w-4 h-4" />
+              <span className="hidden sm:block">Sobre o Projeto & IA</span>
+            </button>
+          </div>
         </div>
       </nav>
+
+      {showInfo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl relative animate-in slide-in-from-bottom-4 duration-300">
+            <button 
+              onClick={() => setShowInfo(false)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="p-8 sm:p-10 space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Como funciona o WorkFinder?</h2>
+                <p className="text-gray-500 text-sm leading-relaxed">
+                  Este projeto demonstra uma arquitetura moderna de automação de RH simulando o comportamento de integrações reais via Webhooks.
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-100">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                      <Cpu className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900">Uso da Inteligência Artificial</h3>
+                  </div>
+                  <div className="space-y-3 text-sm text-gray-600 leading-relaxed text-balance">
+                    <p><strong>1. Extração de Currículo:</strong> Para evitar bloqueios e garantir funcionamento imediato, a leitura do seu currículo em PDF utiliza bibliotecas de texto nativas (pdf-parse) e Expressões Regulares (RegEx) avançadas para extrair seus dados.</p>
+                    <p><strong>2. Integração com Automação (Make / IA):</strong> Se você configurar a variável <code>VITE_MAKE_WEBHOOK_URL</code> no seu `.env`, a plataforma encaminhará seus dados diretamente para a sua automação no <strong>Make.com</strong>, onde você pode processar usando módulos customizados.</p>
+                    <p><strong>3. Fallback Local com Google Deep Search:</strong> Selecionamos as melhores vagas da Remotive e utilizamos o algorítmo interno (Google Deep Search) para simular o score de compatibilidade com precisão detalhada!</p>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50/50 rounded-2xl p-6 border border-gray-200/60">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="bg-gray-200/60 p-2 rounded-lg text-gray-600">
+                      <Terminal className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900">Como Rodar Localmente</h3>
+                  </div>
+                  <div className="space-y-4 text-sm text-gray-600">
+                    <p>Se você clonar este projeto (Frontend em Vite + Backend em Express), siga os passos:</p>
+                    <ol className="list-decimal list-inside space-y-2 ml-1">
+                      <li>Use <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">npm install</code> para instalar dependências.</li>
+                      <li>Inicie ambos Web/API com <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">npm run dev</code>.</li>
+                      <li>Configure as variáveis em <code>.env</code> (GROQ_API_KEY e VITE_MAKE_WEBHOOK_URL) para liberar o envio de e-mail via Make.</li>
+                    </ol>
+                    <p className="pt-2 text-xs text-gray-400">Todo o fluxo de backend foi projetado para fácil replicação no n8n ou Make.com, alterando apenas a variável <code>VITE_MAKE_WEBHOOK_URL</code>.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-3xl mx-auto px-6 py-16 sm:py-24">
         {step === 1 && (

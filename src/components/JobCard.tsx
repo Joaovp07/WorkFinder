@@ -12,7 +12,7 @@ export interface Job {
   link: string;
 }
 
-export function JobCard({ job }: { job: Job }) {
+export const JobCard: React.FC<{ job: Job }> = ({ job }) => {
   const isHighMatch = job.compatibilidade >= 80;
   const isMediumMatch = job.compatibilidade >= 60 && job.compatibilidade < 80;
 

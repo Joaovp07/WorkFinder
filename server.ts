@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import multer from "multer";
 import { createServer as createViteServer } from "vite";
-import nodemailer from "nodemailer";
 import pdfParse from "pdf-parse-debugging-disabled";
 
 // Setup multer for memory storage (for resume upload)
@@ -14,6 +13,15 @@ async function startServer() {
 
   // Middleware to parse JSON bodies
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  // Handle OPTIONS for all /api routes
+  app.options("/api/*", (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+    res.sendStatus(200);
+  });
 
   // 1. POST /api/usuario -> Recebe profile e currículo (fallback para salvar, ou apenas processar direto)
   // Como é protótipo, podemos juntar a análise na rota /api/analisar-vagas
@@ -149,10 +157,10 @@ async function startServer() {
 
   // Endpoint /api/analisar-vagas removido (agora processado localmente no frontend)
 
-  // 9. POST /api/webhook-mock -> Mock da integração com Make.com
-  app.post("/api/webhook-mock", async (req, res) => {
+  // 9. POST /api/match-vagas -> Integração Remotive + Llama 3 Groq AI
+  app.post("/api/match-vagas", async (req, res) => {
     try {
-      console.log("[Webhook Mock] Recebido payload do frontend:", req.body);
+      console.log("[Match Vagas] Recebido payload do frontend:", req.body);
       
       const { candidato, curriculoBase64, fileName } = req.body;
       
@@ -160,145 +168,36 @@ async function startServer() {
          return res.status(400).json({ error: "Dados do candidato não fornecidos." });
       }
 
-      // Simulate a slightly delayed make.com response
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Importar o novo serviço Groq + Node (Llama 3 Match)
+      const { MatchService } = await import("./src/services/MatchService.ts");
+      const matchService = new MatchService();
 
-      // Mock response array that Make would return after processing Gemini + Remotive
-      const makeMockResponse = [
-        {
-          vagaId: 101,
-          titulo: "Desenvolvedor Front-end Sênior",
-          empresa: "Acme Corp",
-          compatibilidade: 95,
-          localizacao: "São Paulo, SP (Remoto)",
-          modelo: "remoto",
-          tecnologias: ["React", "TypeScript", "Tailwind CSS"],
-          motivos: [
-            "Você possui forte conhecimento nas principais tech da vaga.",
-            "O nível da vaga condiz com seu resumo.",
-            "A vaga é remota, combinando com sua preferência."
-          ],
-          link: "https://remotive.com/job/101"
-        },
-        {
-          vagaId: 102,
-          titulo: "Engenheiro de Software Fullstack",
-          empresa: "Global Tech",
-          compatibilidade: 82,
-          localizacao: "Remoto Global",
-          modelo: "remoto",
-          tecnologias: ["Node.js", "React", "PostgreSQL"],
-          motivos: [
-            "Tecnologias compatíveis, embora focadas também no back-end.",
-            "Excelente empresa com cultura remote-first."
-          ],
-          link: "https://remotive.com/job/102"
-        },
-        {
-          vagaId: 103,
-          titulo: "Desenvolvedor UI/UX",
-          empresa: "Designers Inc",
-          compatibilidade: 65,
-          localizacao: "Híbrido",
-          modelo: "híbrido",
-          tecnologias: ["Figma", "CSS", "React"],
-          motivos: [
-            "Exige mais design do que você especificou.",
-            "A vaga é híbrida, mas ainda pode ser interessante."
-          ],
-          link: "https://remotive.com/job/103"
-        }
-      ];
+      // Executar todo o fluxo: fetch -> Llama 3 AI Match -> Nodemailer
+      const finalJobs = await matchService.executeFlow(candidato);
 
-      res.json({ jobs: makeMockResponse });
+      console.log("[Match Vagas] Processamento completo via Groq (Llama 3).");
+      res.json({ jobs: finalJobs });
+
     } catch (error) {
-      console.error("[Webhook Mock] Error:", error);
-      res.status(500).json({ error: "Failed to process webhook mock" });
+      console.error("[Match Vagas] Error:", error);
+      res.status(500).json({ error: "Failed to process match: " + (error instanceof Error ? error.message : String(error)) });
     }
   });
 
-  // Make.com Webhook Proxy to bypass CORS
-  app.post("/api/webhook-proxy", async (req, res) => {
-    try {
-      const { webhookUrl, payload } = req.body;
-      if (!webhookUrl) return res.status(400).json({ error: "Missing webhookUrl" });
-
-      const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const responseText = await response.text();
-      res.status(response.status).send(responseText);
-    } catch (error) {
-      console.error("[Webhook Proxy] Error:", error);
-      res.status(500).json({ error: "Failed proxying webhook: " + (error instanceof Error ? error.message : String(error)) });
-    }
-  });
-
-  // 4. POST /api/enviar-email -> Envia email simulado (Nodemailer)
-  app.post("/api/enviar-email", async (req, res) => {
-    try {
-      const { email, nome, vagas } = req.body;
-
-      // Create a test account or use realistic settings
-      // For this prototype, we'll use ethereal.email to simulate and print console
-      const testAccount = await nodemailer.createTestAccount();
-
-      const transporter = nodemailer.createTransport({
-        host: "smtp.ethereal.email",
-        port: 587,
-        secure: false,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-      });
-
-      let htmlVagas = vagas.map((v: any) => `
-        <div style="margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
-          <h3>${v.titulo} na ${v.empresa}</h3>
-          <p><strong>Compatibilidade:</strong> <span style="color: green;">${v.compatibilidade}%</span></p>
-          <p><strong>Motivos:</strong></p>
-          <ul>
-            ${v.motivos.map((m: string) => `<li>${m}</li>`).join('')}
-          </ul>
-          <a href="${v.link}" style="display:inline-block; padding:10px 15px; background: #007bff; color: white; text-decoration: none; border-radius: 5px;">Candidatar-se</a>
-        </div>
-      `).join("");
-
-      const mailOptions = {
-        from: '"WorkFinder" <noreply@workfinder.com>',
-        to: email,
-        subject: `Aqui estão suas melhores vagas, ${nome}!`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: auto;">
-            <h2>Olá, ${nome}! 👋</h2>
-            <p>Analisamos seu currículo e perfil e encontramos ótimas oportunidades para você!</p>
-            <hr />
-            ${htmlVagas}
-            <br />
-            <p>Boa sorte nas candidaturas!</p>
-            <p><strong>Equipe WorkFinder</strong></p>
-          </div>
-        `,
-      };
-
-      const info = await transporter.sendMail(mailOptions);
-      console.log("E-mail simulado enviado com sucesso! URL:", nodemailer.getTestMessageUrl(info));
-
-      res.json({ success: true, previewUrl: nodemailer.getTestMessageUrl(info) });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Failed to send email" });
-    }
-  });
+  // Endpoint removido: webhook-proxy (agora o backend chama o make diretamente)
+  
+  // Endpoint removido: enviar-email (agora o backend usa o webhook do make)
 
 
   // API 404 fallback
   app.use("/api", (req, res) => {
     res.status(404).json({ error: "API endpoint not found", path: req.path });
+  });
+
+  // API Error handling middleware
+  app.use("/api", (err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("API Error:", err);
+    res.status(500).json({ error: err.message || "Internal Server Error" });
   });
 
   // Vite middleware for development
